@@ -79,7 +79,6 @@ func (w *WorldX) GenerateAliens(numberAliens int) {
         w.Aliens = make(map[string]*Alien)
     }
 
-    // Get slice with the names of empty cities
     emptyCities := make([]string, 0, len(w.Cities))
     for cityName, city := range w.Cities {
         if city.Alien == nil {
@@ -96,16 +95,80 @@ func (w *WorldX) GenerateAliens(numberAliens int) {
         }
 
         alienName := strconv.Itoa(alienIndex)
-        newAlien := Alien{alienName, w.Cities[randomEmptyCity]}
+        randomCity := w.Cities[randomEmptyCity]
+        isTrapped := len(randomCity.ConnectedCities) == 0
+        newAlien := Alien{alienName, w.Cities[randomEmptyCity], isTrapped}
         w.Aliens[alienName] = &newAlien
-        w.Cities[randomEmptyCity].Alien = &newAlien
-
-        fmt.Println("Alien", w.Aliens[alienName].Name, "placed in city", w.Aliens[alienName].Location.Name)
+        randomCity.Alien = &newAlien
     }
 }
 
+// Simulates invasion moving each alien maxIterations times and destroying city if aliens collide.
 func (w *WorldX) RunSimulation() {
-    panic("RunSimulation is not yet implemented!")
+    const maxIterations int = 10000
+
+    rand.Seed(time.Now().UnixNano())
+    for iteration := 0; iteration < maxIterations; iteration++ {
+        for _, alien := range w.Aliens {
+            w.MoveAlien(alien)
+        }
+    }
+}
+
+// Moves alien from its current city to a random connected city
+// If an alien is already present they fight and both the city and aliens are destroyed
+func (w *WorldX) MoveAlien(alien *Alien) {
+    w.mux.Lock()
+    defer w.mux.Unlock()
+
+    if alien.IsTrapped {
+        return
+    }
+
+    nextCity := alien.Location.getRandomConnectedCity()
+    if nextCity == nil {
+        alien.IsTrapped = true
+        return
+    } else if nextCity.Alien != nil {
+        w.destroyCity(nextCity, alien, nextCity.Alien)
+    } else {
+        alien.Location.Alien = nil
+        alien.Location = nextCity
+        nextCity.Alien = alien
+        if len(nextCity.ConnectedCities) == 0 {
+            alien.IsTrapped = true
+        }
+    }
+}
+
+// Removes connections to the city, and destroys the city and both aliens
+func (w *WorldX) destroyCity(city *City, alien1 *Alien, alien2 *Alien) {
+    defer fmt.Printf("%s has been destroyed by alien %s and alien %s\n", city.Name, alien1.Name, alien2.Name)
+    w.deleteAlien(alien1)
+    w.deleteAlien(alien2)
+    w.deleteCity(city)
+}
+
+func (w *WorldX) deleteAlien(alien *Alien) {
+    if alien.Location != nil {
+        alien.Location.Alien = nil
+        alien.Location = nil
+    }
+    delete(w.Aliens, alien.Name)
+    alien = nil
+}
+
+func (w *WorldX) deleteCity(city *City) {
+    for dir, connectedCity := range city.ConnectedCities {
+        delete(connectedCity.ConnectedCities, dir.GetOpposite())
+    }
+
+    if city.Alien != nil {
+        city.Alien.Location = nil
+        city.Alien = nil
+    }
+    delete(w.Cities, city.Name)
+    city = nil
 }
 
 type Direction string
@@ -136,7 +199,7 @@ func (d Direction) GetOpposite() Direction {
 	case West :
 		return East
 	default :
-		return ""
+		return "unknown"
 	}
 }
 
@@ -155,9 +218,27 @@ func (c *City) String() (cStr string) {
 	return
 }
 
+// Returns pointer to random connected city or nil if city is isolated (i.e. doesn't have connections)
+func (c *City) getRandomConnectedCity() (randomCity *City) {
+    maxConnections := len(c.ConnectedCities)
+    if maxConnections > 0 {
+        move, randomConnection := 0, rand.Intn(maxConnections)
+        for _, randomCity = range c.ConnectedCities {
+            if move == randomConnection {
+                return
+            }
+            move++
+        }
+        return
+    } else {
+        return nil
+    }
+}
+
 type Alien struct {
-	Name     string
-	Location *City
+	Name      string
+	Location  *City
+	IsTrapped bool
 }
 
 func ReadWorldMap(file *os.File) (world WorldX) {
@@ -209,7 +290,7 @@ func Invade(filename string, numberAliens int) {
 	world := ReadWorldMap(file)
 
 	world.GenerateAliens(numberAliens)
-	//world.RunSimulation()
+	world.RunSimulation()
 
 	fmt.Print(world.String())
 }
