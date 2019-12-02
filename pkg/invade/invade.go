@@ -1,12 +1,15 @@
 package invade
 
 import (
-	"bufio"
-	"fmt"
-	"log"
-	"os"
-	"strings"
-	"sync"
+    "bufio"
+    "fmt"
+    "log"
+    "math/rand"
+    "os"
+    "strconv"
+    "strings"
+    "sync"
+    "time"
 )
 
 type WorldX struct {
@@ -26,6 +29,7 @@ func (w *WorldX) String() (wStr string) {
 	return
 }
 
+// If city doesn't exist yet, creates and adds it to the world
 func (w *WorldX) AddCity(cityName string) {
 	w.mux.Lock()
 	w.getCity(cityName)
@@ -43,7 +47,6 @@ func (w *WorldX) AddCityConnection(cityName1 string, cityName2 string, dir Direc
 	w.mux.Unlock()
 }
 
-// Returns pointer to city with cityName, if city doesn't exist it's created and added to the world
 func (w *WorldX) getCity(cityName string) *City {
 	if w.Cities == nil {
 		w.Cities = make(map[string]*City)
@@ -56,6 +59,53 @@ func (w *WorldX) getCity(cityName string) *City {
 		w.Cities[cityName] = &newCity
 		return &newCity
 	}
+}
+
+// Generates aliens and places them in a random empty city.
+// Fails on the tentative to generate more aliens than the number of cities.
+func (w *WorldX) GenerateAliens(numberAliens int) {
+    w.mux.Lock()
+    defer w.mux.Unlock()
+
+    if totalAliens, totalCities := len(w.Aliens) + numberAliens, len(w.Cities); totalAliens > totalCities {
+        log.Panicf(
+            "GenerateAliens: cannot have more aliens in the world than the number of cities! Aliens: %d > Cities: %d",
+            totalAliens, totalCities)
+    } else if numberAliens <= 0 {
+        log.Panicf("GenerateAliens: the number of aliens to be generated need to be positive.")
+    }
+
+    if w.Aliens == nil {
+        w.Aliens = make(map[string]*Alien)
+    }
+
+    // Get slice with the names of empty cities
+    emptyCities := make([]string, 0, len(w.Cities))
+    for cityName, city := range w.Cities {
+        if city.Alien == nil {
+            emptyCities = append(emptyCities, cityName)
+        }
+    }
+    totalEmptyCities := len(emptyCities)
+
+    rand.Seed(time.Now().UnixNano())
+    for alienIndex := 0; alienIndex < numberAliens; alienIndex++ {
+        randomEmptyCity := emptyCities[rand.Intn(totalEmptyCities)]
+        for w.Cities[randomEmptyCity].Alien != nil {
+            randomEmptyCity = emptyCities[rand.Intn(totalEmptyCities)]
+        }
+
+        alienName := strconv.Itoa(alienIndex)
+        newAlien := Alien{alienName, w.Cities[randomEmptyCity]}
+        w.Aliens[alienName] = &newAlien
+        w.Cities[randomEmptyCity].Alien = &newAlien
+
+        fmt.Println("Alien", w.Aliens[alienName].Name, "placed in city", w.Aliens[alienName].Location.Name)
+    }
+}
+
+func (w *WorldX) RunSimulation() {
+    panic("RunSimulation is not yet implemented!")
 }
 
 type Direction string
@@ -119,13 +169,13 @@ func ReadWorldMap(file *os.File) (world WorldX) {
 		for i, value := range cityDetails {
 
 			if i == 0 {
-				newCity = value
-				world.AddCity(newCity)
+			    newCity = value
+                world.AddCity(newCity)
 			} else {
 				directionDetails := strings.SplitN(value, "=", 2)
 				direction := Direction(directionDetails[0])
 
-				// Ignore directions without or with empty city name, and invalid directions
+				// Ignore directions without city name, with empty city name, and invalid directions
 				if len(directionDetails) == 2 && len(directionDetails[1]) > 0 && direction.IsValid() {
 
 				    // Only add connection if it doesn't exist yet, duplicated connections are ignored
@@ -145,10 +195,6 @@ func ReadWorldMap(file *os.File) (world WorldX) {
 	return world
 }
 
-func RunSimulation(world *WorldX, totalAliens int) {
-	panic("RunSimulation is not yet implemented!")
-}
-
 func Invade(filename string, numberAliens int) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -162,8 +208,8 @@ func Invade(filename string, numberAliens int) {
 
 	world := ReadWorldMap(file)
 
-	//RunSimulation(&world, numberAliens)
-	fmt.Println("World X was invaded by", numberAliens, "aliens.")
+	world.GenerateAliens(numberAliens)
+	//world.RunSimulation()
 
 	fmt.Print(world.String())
 }
