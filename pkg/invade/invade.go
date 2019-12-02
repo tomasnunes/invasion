@@ -125,9 +125,14 @@ func ReadWorldMap(file *os.File) (world WorldX) {
 				directionDetails := strings.SplitN(value, "=", 2)
 				direction := Direction(directionDetails[0])
 
+				// Ignore directions without or with empty city name, and invalid directions
 				if len(directionDetails) == 2 && len(directionDetails[1]) > 0 && direction.IsValid() {
-					connectedCity := directionDetails[1]
-					world.AddCityConnection(newCity, connectedCity, direction)
+
+				    // Only add connection if it doesn't exist yet, duplicated connections are ignored
+				    if _, ok := world.Cities[newCity].ConnectedCities[direction]; !ok {
+                        connectedCity := directionDetails[1]
+                        world.AddCityConnection(newCity, connectedCity, direction)
+                    }
 				}
 			}
 		}

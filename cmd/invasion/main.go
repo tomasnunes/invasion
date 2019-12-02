@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"strconv"
+
+	"github.com/tomasnunes/invasion/pkg/invade"
 )
 
 const (
@@ -65,6 +67,5 @@ func main() {
 		log.Fatalf("%s: is a directory, should be a file with the description of the world map.", filename)
 	}
 
-	//Invade(filename, numberAliens)
-	fmt.Println("Invade world X with", numberAliens, "aliens.")
+	invade.Invade(filename, numberAliens)
 }
