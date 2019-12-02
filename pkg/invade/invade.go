@@ -4,265 +4,34 @@ import (
     "bufio"
     "fmt"
     "log"
-    "math/rand"
     "os"
-    "strconv"
     "strings"
-    "sync"
-    "time"
+
+    "github.com/tomasnunes/invasion/pkg/worldx"
 )
 
-type WorldX struct {
-	Cities map[string]*City  // Maps city name to pointer of respective city
-	Aliens map[string]*Alien // Maps alien name to pointer of respective alien
-	mux    sync.RWMutex
-}
-
-func (w *WorldX) String() (wStr string) {
-	w.mux.RLock()
-	defer w.mux.RUnlock()
-
-	for _, city := range w.Cities {
-		wStr += city.String() + "\n"
-	}
-
-	return
-}
-
-// If city doesn't exist yet, creates and adds it to the world
-func (w *WorldX) AddCity(cityName string) {
-	w.mux.Lock()
-	w.getCity(cityName)
-	w.mux.Unlock()
-}
-
-// Adds connection between city1 and city2, if any of the cities doesn't exist, it's created and added to the world
-func (w *WorldX) AddCityConnection(cityName1 string, cityName2 string, dir Direction) {
-	w.mux.Lock()
-
-	city1, city2 := w.getCity(cityName1), w.getCity(cityName2)
-	city1.ConnectedCities[dir] = city2
-	city2.ConnectedCities[dir.GetOpposite()] = city1
-
-	w.mux.Unlock()
-}
-
-func (w *WorldX) getCity(cityName string) *City {
-	if w.Cities == nil {
-		w.Cities = make(map[string]*City)
-	}
-
-	if city, ok := w.Cities[cityName]; ok {
-		return city
-	} else {
-		newCity := City{cityName, map[Direction]*City{}, nil}
-		w.Cities[cityName] = &newCity
-		return &newCity
-	}
-}
-
-// Generates aliens and places them in a random empty city.
-// Fails on the tentative to generate more aliens than the number of cities.
-func (w *WorldX) GenerateAliens(numberAliens int) {
-    w.mux.Lock()
-    defer w.mux.Unlock()
-
-    if totalAliens, totalCities := len(w.Aliens) + numberAliens, len(w.Cities); totalAliens > totalCities {
-        log.Panicf(
-            "GenerateAliens: cannot have more aliens in the world than the number of cities! Aliens: %d > Cities: %d",
-            totalAliens, totalCities)
-    } else if numberAliens <= 0 {
-        log.Panicf("GenerateAliens: the number of aliens to be generated need to be positive.")
-    }
-
-    if w.Aliens == nil {
-        w.Aliens = make(map[string]*Alien)
-    }
-
-    emptyCities := make([]string, 0, len(w.Cities))
-    for cityName, city := range w.Cities {
-        if city.Alien == nil {
-            emptyCities = append(emptyCities, cityName)
-        }
-    }
-    totalEmptyCities := len(emptyCities)
-
-    rand.Seed(time.Now().UnixNano())
-    for alienIndex := 0; alienIndex < numberAliens; alienIndex++ {
-        randomEmptyCity := emptyCities[rand.Intn(totalEmptyCities)]
-        for w.Cities[randomEmptyCity].Alien != nil {
-            randomEmptyCity = emptyCities[rand.Intn(totalEmptyCities)]
-        }
-
-        alienName := strconv.Itoa(alienIndex)
-        randomCity := w.Cities[randomEmptyCity]
-        isTrapped := len(randomCity.ConnectedCities) == 0
-        newAlien := Alien{alienName, w.Cities[randomEmptyCity], isTrapped}
-        w.Aliens[alienName] = &newAlien
-        randomCity.Alien = &newAlien
-    }
-}
-
-// Simulates invasion moving each alien maxIterations times and destroying city if aliens collide.
-func (w *WorldX) RunSimulation() {
-    const maxIterations int = 10000
-
-    rand.Seed(time.Now().UnixNano())
-    for iteration := 0; iteration < maxIterations; iteration++ {
-        for _, alien := range w.Aliens {
-            w.MoveAlien(alien)
-        }
-    }
-}
-
-// Moves alien from its current city to a random connected city
-// If an alien is already present they fight and both the city and aliens are destroyed
-func (w *WorldX) MoveAlien(alien *Alien) {
-    w.mux.Lock()
-    defer w.mux.Unlock()
-
-    if alien.IsTrapped {
-        return
-    }
-
-    nextCity := alien.Location.getRandomConnectedCity()
-    if nextCity == nil {
-        alien.IsTrapped = true
-        return
-    } else if nextCity.Alien != nil {
-        w.destroyCity(nextCity, alien, nextCity.Alien)
-    } else {
-        alien.Location.Alien = nil
-        alien.Location = nextCity
-        nextCity.Alien = alien
-        if len(nextCity.ConnectedCities) == 0 {
-            alien.IsTrapped = true
-        }
-    }
-}
-
-// Removes connections to the city, and destroys the city and both aliens
-func (w *WorldX) destroyCity(city *City, alien1 *Alien, alien2 *Alien) {
-    defer fmt.Printf("%s has been destroyed by alien %s and alien %s\n", city.Name, alien1.Name, alien2.Name)
-    w.deleteAlien(alien1)
-    w.deleteAlien(alien2)
-    w.deleteCity(city)
-}
-
-func (w *WorldX) deleteAlien(alien *Alien) {
-    if alien.Location != nil {
-        alien.Location.Alien = nil
-        alien.Location = nil
-    }
-    delete(w.Aliens, alien.Name)
-    alien = nil
-}
-
-func (w *WorldX) deleteCity(city *City) {
-    for dir, connectedCity := range city.ConnectedCities {
-        delete(connectedCity.ConnectedCities, dir.GetOpposite())
-    }
-
-    if city.Alien != nil {
-        city.Alien.Location = nil
-        city.Alien = nil
-    }
-    delete(w.Cities, city.Name)
-    city = nil
-}
-
-type Direction string
-
-const (
-	North Direction = "north"
-	South           = "south"
-	East            = "east"
-	West            = "west"
-)
-
-func (d Direction) String() string {
-	return string(d)
-}
-
-func (d Direction) IsValid() bool {
-	return d == North || d == South || d == East || d == West
-}
-
-func (d Direction) GetOpposite() Direction {
-	switch d {
-	case North :
-		return South
-	case South :
-		return North
-	case East :
-		return West
-	case West :
-		return East
-	default :
-		return "unknown"
-	}
-}
-
-type City struct {
-	Name            string
-	ConnectedCities map[Direction]*City
-	Alien           *Alien
-}
-
-func (c *City) String() (cStr string) {
-	cStr = c.Name
-	for direction, city := range c.ConnectedCities {
-		cStr += " " + direction.String() + "=" + city.Name
-	}
-
-	return
-}
-
-// Returns pointer to random connected city or nil if city is isolated (i.e. doesn't have connections)
-func (c *City) getRandomConnectedCity() (randomCity *City) {
-    maxConnections := len(c.ConnectedCities)
-    if maxConnections > 0 {
-        move, randomConnection := 0, rand.Intn(maxConnections)
-        for _, randomCity = range c.ConnectedCities {
-            if move == randomConnection {
-                return
-            }
-            move++
-        }
-        return
-    } else {
-        return nil
-    }
-}
-
-type Alien struct {
-	Name      string
-	Location  *City
-	IsTrapped bool
-}
-
-func ReadWorldMap(file *os.File) (world WorldX) {
+// Reads map of World X from file, returns new world with the cities and connections described
+func ReadWorldMap(file *os.File) (world worldx.WorldX) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 
-		var newCity string
+		var newCity *worldx.City
 		cityDetails := strings.Fields(scanner.Text())
 		for i, value := range cityDetails {
 
 			if i == 0 {
-			    newCity = value
-                world.AddCity(newCity)
-			} else {
+			    newCity = world.CreateCity(value)
+			} else if newCity != nil {
 				directionDetails := strings.SplitN(value, "=", 2)
-				direction := Direction(directionDetails[0])
+				direction := worldx.Direction(directionDetails[0])
 
 				// Ignore directions without city name, with empty city name, and invalid directions
 				if len(directionDetails) == 2 && len(directionDetails[1]) > 0 && direction.IsValid() {
 
 				    // Only add connection if it doesn't exist yet, duplicated connections are ignored
-				    if _, ok := world.Cities[newCity].ConnectedCities[direction]; !ok {
-                        connectedCity := directionDetails[1]
-                        world.AddCityConnection(newCity, connectedCity, direction)
+				    if _, ok := newCity.ConnectedCities[direction]; !ok {
+                        connectedCity := world.CreateCity(directionDetails[1])
+                        world.CreateConnection(newCity, connectedCity, direction)
                     }
 				}
 			}
@@ -276,6 +45,7 @@ func ReadWorldMap(file *os.File) (world WorldX) {
 	return world
 }
 
+// Reads world map from file, generates aliens and runs the simulation of the invasion
 func Invade(filename string, numberAliens int) {
 	file, err := os.Open(filename)
 	if err != nil {
