@@ -1,13 +1,15 @@
 package main
 
 import (
+    "bufio"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 
-	"github.com/tomasnunes/invasion/pkg/invade"
+    "../../pkg/worldx"
+	//"github.com/tomasnunes/invasion/pkg/invade"
 )
 
 const (
@@ -67,5 +69,28 @@ func main() {
 		log.Fatalf("%s: is a directory, should be a file with the description of the world map.", filename)
 	}
 
-	invade.Invade(filename, numberAliens)
+	Invade(filename, numberAliens)
+}
+
+// Creates world map with the description on the file, generates aliens, runs the simulation of the invasion,
+// and prints the final state of the world
+func Invade(filename string, numberAliens int) {
+    file, err := os.Open(filename)
+    if err != nil {
+        log.Panic(err)
+    }
+    defer func() {
+        if err = file.Close(); err != nil {
+            log.Panic(err)
+        }
+    }()
+
+    world := worldx.WorldX{}
+
+    scanner := bufio.NewScanner(file)
+    world.ReadWorldMap(scanner)
+    world.GenerateAliens(numberAliens)
+    world.RunSimulation()
+
+    fmt.Print(world.String())
 }

@@ -1,10 +1,12 @@
 package worldx
 
 import (
+    "bufio"
     "fmt"
     "log"
     "math/rand"
     "strconv"
+    "strings"
     "time"
 )
 
@@ -62,7 +64,7 @@ func (c *City) String() (cStr string) {
 }
 
 // Returns pointer to random connected city or nil if city is isolated (i.e. doesn't have connections)
-func (c *City) getRandomConnectedCity() (randomCity *City) {
+func (c *City) getRandomConnection() (randomCity *City) {
     maxConnections := len(c.ConnectedCities)
     if maxConnections > 0 {
         move, randomConnection := 0, rand.Intn(maxConnections)
@@ -90,6 +92,38 @@ func (w *WorldX) String() (wStr string) {
 
     return
 }
+// Reads map of World X from the provided scanner and populates world with the cities and connections described.
+// Panics if errors occur while reading the scanner or creating the cities and connections.
+func (w *WorldX) ReadWorldMap(scanner *bufio.Scanner) {
+    const defaultDirectionSeparator string = "="
+
+    for scanner.Scan() {
+        var newCity *City
+        cityDetails := strings.Fields(scanner.Text())
+        for i, value := range cityDetails {
+            if i == 0 {
+                newCity = w.CreateCity(value)
+            } else if newCity != nil {
+                directionDetails := strings.SplitN(value, defaultDirectionSeparator, 2)
+                direction := Direction(directionDetails[0])
+
+                // Ignore directions without city name, with empty city name, and invalid directions
+                if len(directionDetails) == 2 && len(directionDetails[1]) > 0 && direction.IsValid() {
+
+                    // Only add connection if it doesn't exist yet, duplicated connections are ignored
+                    if _, ok := newCity.ConnectedCities[direction]; !ok {
+                        connectedCity := w.CreateCity(directionDetails[1])
+                        w.CreateConnection(newCity, connectedCity, direction)
+                    }
+                }
+            }
+        }
+    }
+
+    if err := scanner.Err(); err != nil {
+        log.Panic(err)
+    }
+}
 
 // Creates and adds city to the world if it doesn't exist yet, returns pointer to city with requested name
 func (w *WorldX) CreateCity(cityName string) *City {
@@ -100,7 +134,11 @@ func (w *WorldX) CreateCity(cityName string) *City {
     if city, ok := w.Cities[cityName]; ok {
         return city
     } else {
-        newCity := City{cityName, map[Direction]*City{}, nil}
+        newCity := City{
+            Name:            cityName,
+            ConnectedCities: map[Direction]*City{},
+            Alien:           nil,
+        }
         w.Cities[cityName] = &newCity
         return &newCity
     }
@@ -130,7 +168,7 @@ func (w *WorldX) getRandomEmptyCity(emptyCities []string) (randomEmptyCity *City
 }
 
 // Generates aliens one at a time placing them in a random empty city.
-// Fails on the tentative to generate more aliens than the number of cities.
+// Panics on the tentative to generate more aliens than the number of cities.
 func (w *WorldX) GenerateAliens(numberAliens int) {
     if totalAliens, totalCities := len(w.Aliens) + numberAliens, len(w.Cities); totalAliens > totalCities {
         log.Panicf(
@@ -165,34 +203,37 @@ func (w *WorldX) CreateAlien(alienName string, possibleEmptyCities []string) *Al
         return alien
     } else {
         randomEmptyCity := w.getRandomEmptyCity(possibleEmptyCities)
-        isTrapped := len(randomEmptyCity.ConnectedCities) == 0
-        newAlien := Alien{alienName, randomEmptyCity, isTrapped}
+        newAlien := Alien{
+            Name:      alienName,
+            Location:  randomEmptyCity,
+            IsTrapped: len(randomEmptyCity.ConnectedCities) == 0,
+        }
         w.Aliens[alienName] = &newAlien
         randomEmptyCity.Alien = &newAlien
         return &newAlien
     }
 }
 
-// Simulates invasion moving each alien maxIterations times and destroying city if aliens collide.
+// Simulates invasion moving each alien defaultMaxIterations times and destroying city if aliens collide.
 func (w *WorldX) RunSimulation() {
-    const maxIterations int = 10000
+    const defaultMaxIterations int = 10000
 
     rand.Seed(time.Now().UnixNano())
-    for iteration := 0; iteration < maxIterations; iteration++ {
+    for iteration := 0; iteration < defaultMaxIterations; iteration++ {
         for _, alien := range w.Aliens {
             w.MoveAlien(alien)
         }
     }
 }
 
-// Moves alien from its current city to a random connected city
-// If an alien is already present they fight and both the city and aliens are destroyed
+// Moves alien from its current city to a random connected city,
+// if an alien is already present they fight and both the city and aliens are destroyed
 func (w *WorldX) MoveAlien(alien *Alien) {
     if alien.IsTrapped {
         return
     }
 
-    nextCity := alien.Location.getRandomConnectedCity()
+    nextCity := alien.Location.getRandomConnection()
     if nextCity == nil {
         alien.IsTrapped = true
         return

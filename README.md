@@ -7,35 +7,43 @@ The final state of the world is printed at the end.
 
 ### Input FILE Fromat (World Map Description)
 
-    <new city name> [north=<connected city name> south=<...> east=<...> west=<...>]
-    ...
+```text
+<new city name> [north=<connected city name> south=<...> east=<...> west=<...>]
+...
+```
 
 - City names cannot contain spaces, any other character is allowed.
-- No effort is made to verify if a `<new city name>` is empty.
+- No effort is made to verify if a `<new city name>` is empty and therefore invalid.
 - Any directional connection is optional, a city doesn't need to connect to other cities in all directions.
 
 ### Packages
 
-- `invade`
-
-    This package depends on the `worldx` package and provides the logic to create a new World X from a file and
-    run the invasion with a specified number of aliens.
-
 - `worldx`
 
-    This package contains the `WorldX`, `Alien`, `City`, and `Direction` types and possible interactions with 
-    this types, like creating cities, generating aliens and running the simulation.
+    This package contains the `WorldX` type and possible interactions with the world to run a full simulation,
+    the exported functions are described bellow:
+    - `ReadWorldMap()` → Reads map of World X from the provided scanner and populates world with the cities and
+    connections described. Panics if errors occur while reading the scanner or creating the cities and connections.
+
+    - `GenerateAliens(numberAliens int)` → Generates aliens one at a time placing them in a random empty city.
+    Panics on the tentative to generate more aliens than the number of cities.
+
+    - `RunSimulation()` → Simulates invasion moving each alien `defaultMaxIterations` times and destroying city if
+    aliens collide.
 
 ## Usage
 
 ### Install Packages
 
-    $ go get github.com/tomasnunes/invasion/pkg/invade
-    $ go get github.com/tomasnunes/invasion/pkg/worldx
+```shell script
+$ go get github.com/tomasnunes/invasion/pkg/worldx
+```
 
 ### Run Program
 
-    $ ./invasion [-h] [N] [FILE]
+```shell script
+$ ./invasion [-h] [N] [FILE]
+```
 
 -h → Prints help message
 
@@ -50,6 +58,7 @@ FILE → Name of the input file with the world map description, if none provided
 - The roads are bidirectional, an Alien invading the world would not be stopped by a unidirectional road, although
 the provided map doesn't need to specify both connections, one is enough to generate the bidirectional connection.
 - City names cannot contain spaces, any other character is allowed.
+- The order in which connections are printed is irrelevant.
 
 ## Trade-Offs, Optimizations and Possible Changes
 
