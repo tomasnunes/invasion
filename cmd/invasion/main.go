@@ -8,8 +8,7 @@ import (
 	"os"
 	"strconv"
 
-    "../../pkg/worldx"
-	//"github.com/tomasnunes/invasion/pkg/invade"
+	"github.com/tomasnunes/invasion/pkg/worldx"
 )
 
 const (

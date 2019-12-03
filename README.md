@@ -45,11 +45,9 @@ $ go get github.com/tomasnunes/invasion/pkg/worldx
 $ ./invasion [-h] [N] [FILE]
 ```
 
--h → Prints help message
-
-N → Number of alien invaders, if none provided defaults to `defaultNumberAliens`
-
-FILE → Name of the input file with the world map description, if none provided defaults to `defaultInputFile`
+- -h → Prints help message
+- N → Number of alien invaders, if none provided defaults to `defaultNumberAliens`
+- FILE → Name of the input file with the world map description, if none provided defaults to `defaultInputFile`
 
 ## Assumptions
 
@@ -58,7 +56,8 @@ FILE → Name of the input file with the world map description, if none provided
 - The roads are bidirectional, an Alien invading the world would not be stopped by a unidirectional road, although
 the provided map doesn't need to specify both connections, one is enough to generate the bidirectional connection.
 - City names cannot contain spaces, any other character is allowed.
-- The order in which connections are printed is irrelevant.
+- The connections to each city are printed in order `north=<...> south=<...> east=<...> west=<...>`,
+independently of the order in which they were read.
 
 ## Trade-Offs, Optimizations and Possible Changes
 
@@ -66,11 +65,11 @@ the provided map doesn't need to specify both connections, one is enough to gene
 If this application was meant to be extended in the future I would have used either 
 [`https://github.com/spf13/cobra`](https://github.com/spf13/cobra) or
 [`https://github.com/urfave/cli`](https://github.com/urfave/cli).
-- For the connections between cities I decided to use maps, mapping the direction of the connection
-to the connected city, I believe it's more readable and intuitive, but it comes at an efficiency cost, 
-using a fixed-sized array and mapping the directions to a number between 0-3 would be much more efficient
-although every city would have an array with size 4 even if the city doesn't have connections in all directions.
-**TL;DR**: Change `ConnectedCities` to `[4]*City` instead of `map[Direction]*City` if the gain in time efficiency 
-out-weights the loss in readability.
+- For the connections between cities I decided to use a fixed-size array `[maxDirections]*city`,
+another option would be a map, `map[direction]*city`, mapping the direction of the connection
+to the connected city. Using an array requires the allocation of a fixed amount of memory, even if 
+the city doesn't have connections in all directions, but an array is way more efficient than the map.
+**TL;DR**: Could change `connectedCities` to `map[direction]*city` if the gain in memory out-weights
+the loss in efficiency.
 - If crypto-level randomness was required I would have used `crypto/rand` instead of `math/rand`.
 The latter is enough for the required use cases and much more efficient.
