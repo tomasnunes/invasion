@@ -11,8 +11,7 @@ import (
 )
 
 func TestReadWorldMap(t *testing.T) {
-    const inputWorldMap =
-`
+    const inputWorldMap = `
 Zuu south=Zoo
 Zoo north=Zuu east=D'Foo
 D'Foo east=Baz south=Bar
@@ -84,7 +83,7 @@ func getGenerateAliensTestWorld(numberCities int) (testWorld worldx.WorldX) {
 func TestGenerateAliens(t *testing.T) {
     const maxAmountAliensToTest = 4
 
-    var generateAliensTests = []struct{
+    var generateAliensTests = []struct {
         numberAliens         int // input
         expectedAmountAliens int // expected amount of aliens created
     }{
@@ -206,7 +205,7 @@ func TestRunSimulationWhenAliensFight(t *testing.T) {
 }
 
 func TestDirection(t *testing.T) {
-    var directionTests = []struct{
+    var directionTests = []struct {
         dir              worldx.Direction // input
         expectedValid    bool             // expected IsValid() result
         expectedString   string           // expected String() result

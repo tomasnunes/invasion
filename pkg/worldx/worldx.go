@@ -60,7 +60,7 @@ func (w *WorldX) ReadWorldMap(scanner *bufio.Scanner) {
 // Generates aliens one at a time placing them in a random empty city.
 // Panics on the tentative to generate more aliens than the number of cities.
 func (w *WorldX) GenerateAliens(numberAliens int) {
-    if totalAliens, totalCities := len(w.Aliens) + numberAliens, len(w.Cities); numberAliens < 0 {
+    if totalAliens, totalCities := len(w.Aliens)+numberAliens, len(w.Cities); numberAliens < 0 {
         log.Panicf("GenerateAliens: the number of aliens to be generated need to be positive.")
     } else if totalAliens > totalCities {
         log.Panicf(
@@ -318,7 +318,7 @@ func (c *City) getRandomConnection() (randomCity *City) {
 type Direction int
 
 const (
-    North Direction  = iota
+    North Direction = iota
     South
     East
     West
