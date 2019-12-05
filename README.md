@@ -1,11 +1,11 @@
 # Simulate Invasion
 
-This command-line application reads and constructs a World X, generates aliens, allocates them to an empty city,
+This command-line application reads and constructs a World X, generates aliens allocating each one to an empty city,
 and simulates an invasion. During the simulation, aliens move between cities at random, when two aliens meet in
 the same city they fight and in the process both aliens die and the city is destroyed severing all its connections.
 The final state of the world is printed at the end.
 
-### Input FILE Fromat (World Map Description)
+### Input file format (World Map description)
 
 ```text
 <new city name> [north=<connected city name> south=<...> east=<...> west=<...>]
@@ -43,7 +43,7 @@ $ go get github.com/tomasnunes/invasion/pkg/worldx
 #### Locally:
 ```shell script
 $ cd invasion
-$ go run cmd/invasion/main.go [-h] [N] [INPUT_FILE] [OUTPUT_INVASION]
+$ go run ./cmd/invasion [-h] [N] [INPUT_FILE] [OUTPUT_INVASION]
 ```
 
 #### Build:
@@ -62,7 +62,7 @@ if none provided defaults to the `stdout`
 #### Tests:
 ```shell script
 $ cd invasion/pkg/worldx
-$ go test
+$ go test -v
 ```
 
 ## Assumptions
@@ -85,13 +85,15 @@ If this application was meant to be extended in the future I would have used eit
 - For the connections between cities I decided to use a fixed-size array `[MaxDirections]*City`,
 another option would be a map, `map[Direction]*City`, mapping the direction of the connection
 to the connected city. Using an array requires the allocation of a fixed amount of memory, even if 
-the city doesn't have connections in all directions, but an array is way more efficient than the map.
+the city doesn't have connections in all directions, but in Go an array is way more efficient than a map.
 **TL;DR:** Could change `connectedCities` to `map[Direction]*City` if the gain in memory out-weights
 the loss in performance.
+- There were more efficient ways to obtain random empty cities and a random direction to move to than trial and
+error but it wouldn't be as random, ergo my implementation. If worst 'randomness' was acceptable other algorithms
+would have been considered in order to improve performance.
 - If crypto-level randomness was required I would have used `crypto/rand` instead of `math/rand`.
 The latter is enough for the required use cases and much more efficient.
--There were more efficient ways to obtain random empty cities and a random direction to move than trial and
-error but it wouldn't be as random, ergo my implementation. 
 - Could add concurrency, for example when creating cities and connections adding a `sync.Mutex` to the
-`City struct` and verifying if a city with the same name already exists in the world using a `sync.RWMutex`
-in the `WorldX struct` allowing multiple concurrent reads.
+`City struct` and verifying if that city already exists in the world using a `sync.RWMutex` in the `WorldX struct`
+allowing for multiple concurrent reads on the `Cities` parameter when checking the presence of the new city name and
+a valid pointer.
