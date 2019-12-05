@@ -1,3 +1,11 @@
-Foo north=Bar west=Baz south=Qu-ux east=Zu
-Bar south=Foo west=Bee east=!@#$%^&*(){}[]-_+=\|;:'"~`,<.>/? north=
-Bye
+Zuu south=Zoo
+Zoo east=D'Foo
+D'Foo east=Baz south=Bar
+Bar north=D'Foo south=Guu east=Foo
+Guu north=Bar east=Fuu south=P=NP
+P=NP north=Guu
+Baz west=D'Foo south=Foo east=Qu-ux
+Foo north=Baz west=Bar south=Fuu east=Goo
+Fuu north=Foo west=Guu
+Goo north=Qu-ux west=Foo
+Alone
